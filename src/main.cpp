@@ -60,7 +60,7 @@ struct ProgramState {
     bool CameraMouseMovementUpdateEnabled = true;
     PointLight pointLight;
     ProgramState()
-            : camera(glm::vec3(0.0f, 0.0f, 3.0f)) {}
+            : camera(glm::vec3(0.0f, 0.0f, 10.0f)) {}
 
     void SaveToFile(std::string filename);
 
@@ -193,7 +193,7 @@ int main() {
 
         // don't forget to enable shader before setting uniforms
         ourShader.use();
-        pointLight.position = glm::vec3(0.0, 0.0f, 200.0);
+        pointLight.position = glm::vec3(0.0, 0.0, 200.0);
         ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
@@ -212,9 +212,11 @@ int main() {
 
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, -14.0f, -15.0f));
-        model = glm::rotate(model, (float)(70*(M_PI/180)), glm::vec3(0.0,1.0,0.0));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -15.0f));
+        model = glm::rotate(model, (float)(currentFrame/4), glm::vec3(sin(23.4*(M_PI/180)),cos(23.4*(M_PI/180)),0.0)); //Implementing Earth rotation
+        model = glm::rotate(model, (float)(-23.4*(M_PI/180)), glm::vec3(0.0, 0.0, 1.0)); //Implementing Earths axial tilt
         model = glm::scale(model, glm::vec3(2));
+        model = glm::translate(model, glm::vec3(0.0f, -6.35f, 0.0f)); //Model is not centered so we do translation before everithing else
         ourShader.setMat4("model", model);
 
         earth_model.Draw(ourShader);
@@ -306,6 +308,7 @@ void DrawImGui(ProgramState *programState) {
         ImGui::DragFloat("pointLight.constant", &programState->pointLight.constant, 0.05, 0.0, 1.0);
         ImGui::DragFloat("pointLight.linear", &programState->pointLight.linear, 0.05, 0.0, 1.0);
         ImGui::DragFloat("pointLight.quadratic", &programState->pointLight.quadratic, 0.05, 0.0, 1.0);
+        ImGui::DragFloat("Movement speed", &programState->camera.MovementSpeed);
         ImGui::End();
     }
 
