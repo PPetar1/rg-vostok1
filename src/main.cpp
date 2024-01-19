@@ -146,7 +146,7 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE); //We use face culling, in this way the side of the models not facing us is not rendered
+    glDisable(GL_CULL_FACE); //We use face culling, in this way the side of the models not facing us is not rendered
 
     // build and compile shaders
     // -------------------------
@@ -155,7 +155,7 @@ int main() {
     // load models
     // -----------
     stbi_set_flip_vertically_on_load(false);
-    Model earth_model("resources/objects/earth/earth.obj");
+    Model earth_model("resources/objects/vostok/scene.gltf");
     earth_model.SetShaderTextureNamePrefix("material.");
     stbi_set_flip_vertically_on_load(true);
 
@@ -212,11 +212,9 @@ int main() {
 
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -15.0f));
-        model = glm::rotate(model, (float)(currentFrame/4), glm::vec3(sin(23.4*(M_PI/180)),cos(23.4*(M_PI/180)),0.0)); //Implementing Earth rotation
-        model = glm::rotate(model, (float)(-23.4*(M_PI/180)), glm::vec3(0.0, 0.0, 1.0)); //Implementing Earths axial tilt
-        model = glm::scale(model, glm::vec3(2));
-        model = glm::translate(model, glm::vec3(0.0f, -6.35f, 0.0f)); //Model is not centered so we do translation before everithing else
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -5.0f));
+        model = glm::rotate(model, (float)(currentFrame/4), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation
+        model = glm::scale(model, glm::vec3(1));
         ourShader.setMat4("model", model);
 
         earth_model.Draw(ourShader);
