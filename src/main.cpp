@@ -2,9 +2,11 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -58,9 +60,11 @@ struct ProgramState {
     bool ImGuiEnabled = false;
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
+    bool FollowModeEnabled = false;
+    glm::vec3 camera_position = glm::vec3(0.0f, 0.0f, 1.3f);
     PointLight pointLight;
     ProgramState()
-            : camera(glm::vec3(0.0f, 0.0f, 10.0f)) {}
+            : camera(glm::vec3(0.0f, 0.0f, 1.3f)) {}
 
     void SaveToFile(std::string filename);
 
@@ -151,11 +155,21 @@ int main() {
     // build and compile shaders
     // -------------------------
     Shader ourShader("resources/shaders/vertex_shader.vs", "resources/shaders/fragment_shader.fs");
+    Shader sunShader("resources/shaders/vertex_shader.vs", "resources/shaders/sun_fragment_shader.fs");
 
     // load models
     // -----------
-    Model earth_model("resources/objects/test/scene.gltf");
+    Model earth_model("resources/objects/earth/scene.gltf");
     earth_model.SetShaderTextureNamePrefix("material.");
+
+    Model vostok_model("resources/objects/vostok/scene.gltf");
+    vostok_model.SetShaderTextureNamePrefix("material.");
+
+    Model moon_model("resources/objects/moon/scene.gltf");
+    moon_model.SetShaderTextureNamePrefix("material.");
+
+    Model sun_model("resources/objects/sun/scene.gltf");
+    sun_model.SetShaderTextureNamePrefix("");
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
@@ -169,7 +183,6 @@ int main() {
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window)) {
@@ -189,6 +202,18 @@ int main() {
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        //
+        glm::mat4 model;
+        if (programState->FollowModeEnabled){
+            model = glm::mat4(1.0f);
+            model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(-1.0,2.0,0.0));
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.1));
+            programState->camera.Position = glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0));
+        }
+        else{
+            programState->camera.Position = programState->camera_position;
+        }
+
         // don't forget to enable shader before setting uniforms
         ourShader.use();
         pointLight.position = glm::vec3(0.0, 0.0, 200.0);
@@ -203,20 +228,54 @@ int main() {
         ourShader.setFloat("material.shininess", 2.0f);
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
-                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
+                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 300.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
+
+        //TODO fix parameters of rotation speeds, distances, sizes of objects to be more realistic..
+        //TODO add a second slightly bihgger earth model with cloud texture
+
         // earth rendering
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -5.0f));
-        model = glm::rotate(model, (float)(currentFrame/80), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, (float)(currentFrame/160), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation
         model = glm::rotate(model, (float)(-M_PI/2), glm::vec3(1.0,0.0,0.0)); //Fixing model wrong orientation
-        model = glm::scale(model, glm::vec3(4));
+        model = glm::scale(model, glm::vec3(0.5));
         ourShader.setMat4("model", model);
 
         earth_model.Draw(ourShader);
+
+        //vostok rendering
+        model = glm::mat4(1.0f);
+        model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.9f));
+        model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(3.0,1.0,-2.0)); //Adding small rotation to the model
+        model = glm::scale(model, glm::vec3(0.005));
+        ourShader.setMat4("model", model);
+
+        vostok_model.Draw(ourShader);
+
+        //moon rendering
+        model = glm::mat4(1.0f);
+        model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 15.0));
+        model = glm::scale(model, glm::vec3(0.1));
+        ourShader.setMat4("model", model);
+
+        moon_model.Draw(ourShader);
+
+        //sun rendering
+        sunShader.use();
+        sunShader.setMat4("projection", projection);
+        sunShader.setMat4("view", view);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 200.0f));
+        model = glm::scale(model, glm::vec3(4));
+        sunShader.setMat4("model", model);
+
+        sun_model.Draw(sunShader);
 
         if (programState->ImGuiEnabled)
             DrawImGui(programState);
@@ -245,15 +304,29 @@ int main() {
 void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    if (!programState->FollowModeEnabled) {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+            programState->camera.ProcessKeyboard(FORWARD, deltaTime);
+            programState->camera_position = programState->camera.Position;
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
+            programState->camera.ProcessKeyboard(BACKWARD, deltaTime);
+            programState->camera_position = programState->camera.Position;
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS){
+            programState->camera.ProcessKeyboard(LEFT, deltaTime);
+            programState->camera_position = programState->camera.Position;
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            programState->camera.ProcessKeyboard(RIGHT, deltaTime);
+            programState->camera_position = programState->camera.Position;
+        }
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        programState->camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        programState->camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        programState->camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        programState->camera.ProcessKeyboard(RIGHT, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        programState->camera.ProcessRotation(-1.0);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        programState->camera.ProcessRotation(1.0);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -316,6 +389,7 @@ void DrawImGui(ProgramState *programState) {
         ImGui::Text("(Yaw, Pitch): (%f, %f)", c.Yaw, c.Pitch);
         ImGui::Text("Camera front: (%f, %f, %f)", c.Front.x, c.Front.y, c.Front.z);
         ImGui::Checkbox("Camera mouse update", &programState->CameraMouseMovementUpdateEnabled);
+        ImGui::Checkbox("Follow capsule", &programState->FollowModeEnabled);
         ImGui::End();
     }
 
