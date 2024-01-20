@@ -146,18 +146,16 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE); //We use face culling, in this way the side of the models not facing us is not rendered
+    glEnable(GL_CULL_FACE); //We use face culling, in this way the side of the models not facing us is not rendered
 
     // build and compile shaders
     // -------------------------
-    Shader ourShader("resources/shaders/2.model_lighting.vs", "resources/shaders/2.model_lighting.fs");
+    Shader ourShader("resources/shaders/vertex_shader.vs", "resources/shaders/fragment_shader.fs");
 
     // load models
     // -----------
-    stbi_set_flip_vertically_on_load(false);
-    Model earth_model("resources/objects/vostok/scene.gltf");
+    Model earth_model("resources/objects/test/scene.gltf");
     earth_model.SetShaderTextureNamePrefix("material.");
-    stbi_set_flip_vertically_on_load(true);
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
@@ -202,7 +200,7 @@ int main() {
         ourShader.setFloat("pointLight.linear", pointLight.linear);
         ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
         ourShader.setVec3("viewPosition", programState->camera.Position);
-        ourShader.setFloat("material.shininess", 32.0f);
+        ourShader.setFloat("material.shininess", 2.0f);
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
@@ -210,11 +208,12 @@ int main() {
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
-        // render the loaded model
+        // earth rendering
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, -5.0f));
-        model = glm::rotate(model, (float)(currentFrame/4), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation
-        model = glm::scale(model, glm::vec3(1));
+        model = glm::rotate(model, (float)(currentFrame/80), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation
+        model = glm::rotate(model, (float)(-M_PI/2), glm::vec3(1.0,0.0,0.0)); //Fixing model wrong orientation
+        model = glm::scale(model, glm::vec3(4));
         ourShader.setMat4("model", model);
 
         earth_model.Draw(ourShader);
