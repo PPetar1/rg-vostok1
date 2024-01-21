@@ -28,7 +28,7 @@ uniform Material material;
 
 uniform vec3 viewPosition;
 // calculates the color when using a point light.
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
+vec4 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     vec3 lightDir = normalize(light.position - fragPos);
     // diffuse shading
@@ -46,13 +46,14 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
     ambient *= attenuation;
     diffuse *= attenuation;
     specular *= attenuation;
-    return (ambient + diffuse + specular);
+
+    return vec4((ambient + diffuse + specular), texture(material.texture_diffuse1, TexCoords).a);
 }
 
 void main()
 {
     vec3 normal = normalize(Normal);
     vec3 viewDir = normalize(viewPosition - FragPos);
-    vec3 result = CalcPointLight(pointLight, normal, FragPos, viewDir);
-    FragColor = vec4(result, 1.0);
+    vec4 result = CalcPointLight(pointLight, normal, FragPos, viewDir);
+    FragColor = result;
 }

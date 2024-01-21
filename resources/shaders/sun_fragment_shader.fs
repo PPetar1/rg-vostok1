@@ -10,5 +10,5 @@ uniform sampler2D texture_diffuse1;
 void main()
 {
     //simple shader that just returns the ambient value of lighting; used to render the sun
-    FragColor = 1.5*vec4(vec3(texture(texture_diffuse1, TexCoords)), 1.0);
+    FragColor = 3*vec4(vec3(texture(texture_diffuse1, TexCoords)), 1.0);
 }

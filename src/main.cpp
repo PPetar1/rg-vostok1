@@ -6,7 +6,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -61,10 +60,9 @@ struct ProgramState {
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
     bool FollowModeEnabled = false;
-    glm::vec3 camera_position = glm::vec3(0.0f, 0.0f, 1.3f);
     PointLight pointLight;
     ProgramState()
-            : camera(glm::vec3(0.0f, 0.0f, 1.3f)) {}
+            : camera(glm::vec3(0.0f, 0.0f, 1.042f)) {}
 
     void SaveToFile(std::string filename);
 
@@ -151,6 +149,8 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE); //We use face culling, in this way the side of the models not facing us is not rendered
+    glEnable(GL_BLEND); //Enabling blending to render clouds properly
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // build and compile shaders
     // -------------------------
@@ -161,6 +161,9 @@ int main() {
     // -----------
     Model earth_model("resources/objects/earth/scene.gltf");
     earth_model.SetShaderTextureNamePrefix("material.");
+
+    Model clouds_model("resources/objects/clouds/scene.gltf");
+    clouds_model.SetShaderTextureNamePrefix("material.");
 
     Model vostok_model("resources/objects/vostok/scene.gltf");
     vostok_model.SetShaderTextureNamePrefix("material.");
@@ -177,9 +180,9 @@ int main() {
     pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
     pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
-    pointLight.constant = 0.001f;
-    pointLight.linear = 0.00009f;
-    pointLight.quadratic = 0.000032f;
+    pointLight.constant = 0.5f;
+    pointLight.linear = 0.0f;
+    pointLight.quadratic = 0.0f;
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -202,21 +205,19 @@ int main() {
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        //
+        //if follow mode is enabled set camera position to follow the capsule
         glm::mat4 model;
         if (programState->FollowModeEnabled){
             model = glm::mat4(1.0f);
-            model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(-1.0,2.0,0.0));
-            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.1));
+            model = glm::rotate(model, (float)(currentFrame/(800*0.06)), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.042f));
+
             programState->camera.Position = glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0));
-        }
-        else{
-            programState->camera.Position = programState->camera_position;
         }
 
         // don't forget to enable shader before setting uniforms
         ourShader.use();
-        pointLight.position = glm::vec3(0.0, 0.0, 200.0);
+        pointLight.position = glm::vec3(0.0, 0.0, 2345.0);
         ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
@@ -228,54 +229,73 @@ int main() {
         ourShader.setFloat("material.shininess", 2.0f);
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
-                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 300.0f);
+                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.001f, 3000.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
 
-        //TODO fix parameters of rotation speeds, distances, sizes of objects to be more realistic..
-        //TODO add a second slightly bihgger earth model with cloud texture
+        // earth model radius 1, moon model radius 1, vostok model radius ~ 1.3, sun model radius 1
+        // earth radius - 6378 km = 1, 23*(M_PI/180) tilt of orbit, vostok orbit ~ 250km (6628 km) = 1.04, vostok size 0.005 km = 0.0000008, vostok orbital period = 0,06 d
+        // moon orbit 384 000 km = 60, moon radius 0.27 of earth, moon orbital period = 29 d, 24*(M_PI/180) tilt of orbit (to equator of earth)
+        // sun distance 149,600,000 km = 23455, sun radius 109 x earth radius
+        //sun rendering
+        //sun size and distance not correct - due to float precision there were some glitches when put to proper values; Sun is here 10x closer and scaled to look ok
+        sunShader.use();
+        sunShader.setMat4("projection", projection);
+        sunShader.setMat4("view", view);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 2345.0f));
+        model = glm::scale(model, glm::vec3(20.0));
+        sunShader.setMat4("model", model);
+
+        sun_model.Draw(sunShader);
 
         // earth rendering
+        ourShader.use();
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, (float)(currentFrame/160), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation
+        model = glm::rotate(model, (float)(currentFrame/800), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation around its axis
         model = glm::rotate(model, (float)(-M_PI/2), glm::vec3(1.0,0.0,0.0)); //Fixing model wrong orientation
-        model = glm::scale(model, glm::vec3(0.5));
+        model = glm::scale(model, glm::vec3(1));
         ourShader.setMat4("model", model);
 
         earth_model.Draw(ourShader);
 
+        // clouds rendering
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, (float)(currentFrame/800), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation around its axis
+        model = glm::rotate(model, (float)(-M_PI/2), glm::vec3(1.0,0.0,0.0)); //Fixing model wrong orientation
+        model = glm::scale(model, glm::vec3(1.005));
+        ourShader.setMat4("model", model);
+
+        clouds_model.Draw(ourShader);
+
         //vostok rendering
         model = glm::mat4(1.0f);
-        model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.9f));
-        model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(3.0,1.0,-2.0)); //Adding small rotation to the model
-        model = glm::scale(model, glm::vec3(0.005));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+
+        model = glm::rotate(model, (float)(currentFrame/(800*0.06)), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.04f));
+        model = glm::rotate(model, (float)((currentFrame+(800*0.1*3))/(800*0.1)), glm::vec3(-1.0,2.0,-3.0)); //Adding small rotation to the model
+        model = glm::scale(model, glm::vec3(1*0.00008));//Model is bigger than it should be to avoid float precision issues
         ourShader.setMat4("model", model);
 
         vostok_model.Draw(ourShader);
 
         //moon rendering
         model = glm::mat4(1.0f);
-        model = glm::rotate(model, (float)(currentFrame/50), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 15.0));
-        model = glm::scale(model, glm::vec3(0.1));
+        model = glm::rotate(model, (float)((currentFrame+(800*29))/(800*29)), glm::vec3(sin((float)(24*(M_PI/180))),cos((float)(24*(M_PI/180))),0.0)); //adding rotation around the earth
+
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 60.0));
+
+        model = glm::rotate(model, (float)(currentFrame/(800*29)), glm::vec3(0.0,1.0,0.0)); //adding rotation around itself
+        model = glm::rotate(model, (float)(-M_PI/2), glm::vec3(1.0,0.0,0.0)); //Fixing model wrong orientation
+        model = glm::scale(model, glm::vec3(0.27));
         ourShader.setMat4("model", model);
 
         moon_model.Draw(ourShader);
-
-        //sun rendering
-        sunShader.use();
-        sunShader.setMat4("projection", projection);
-        sunShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 200.0f));
-        model = glm::scale(model, glm::vec3(4));
-        sunShader.setMat4("model", model);
-
-        sun_model.Draw(sunShader);
 
         if (programState->ImGuiEnabled)
             DrawImGui(programState);
@@ -305,22 +325,17 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     if (!programState->FollowModeEnabled) {
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
             programState->camera.ProcessKeyboard(FORWARD, deltaTime);
-            programState->camera_position = programState->camera.Position;
-        }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
+
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
             programState->camera.ProcessKeyboard(BACKWARD, deltaTime);
-            programState->camera_position = programState->camera.Position;
-        }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS){
+
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
             programState->camera.ProcessKeyboard(LEFT, deltaTime);
-            programState->camera_position = programState->camera.Position;
-        }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             programState->camera.ProcessKeyboard(RIGHT, deltaTime);
-            programState->camera_position = programState->camera.Position;
-        }
 
     }
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
