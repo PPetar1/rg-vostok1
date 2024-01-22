@@ -27,15 +27,29 @@ uniform PointLight pointLight;
 uniform Material material;
 
 uniform vec3 viewPosition;
+
+uniform bool enable_fong = false;
+
 // calculates the color when using a point light.
 vec4 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     vec3 lightDir = normalize(light.position - fragPos);
-    // diffuse shading
+
     float diff = max(dot(normal, lightDir), 0.0);
-    // specular shading
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+
+    float spec = 0.0;
+    if (enable_fong){
+        vec3 reflectDir = reflect(-lightDir, normal);
+        spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+    }
+    else{
+        if (dot(lightDir, normal) > 0.0){
+
+            vec3 halfwayDir = normalize(lightDir + viewDir);
+            spec = pow(max(dot(normal, halfwayDir), 0.0), 3*material.shininess);
+        }
+    }
+
     // attenuation
     float distance = length(light.position - fragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));

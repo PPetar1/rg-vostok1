@@ -60,9 +60,10 @@ struct ProgramState {
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
     bool FollowModeEnabled = false;
+    bool enable_fong = false;
     PointLight pointLight;
     ProgramState()
-            : camera(glm::vec3(0.0f, 0.0f, 1.042f)) {}
+            : camera(glm::vec3(0.0f, 0.0f, 3.0f)) {}
 
     void SaveToFile(std::string filename);
 
@@ -176,13 +177,13 @@ int main() {
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
-    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
+    pointLight.ambient = glm::vec3(0.05, 0.05, 0.05);
     pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
-    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
+    pointLight.specular = glm::vec3(0.5, 0.5, 0.5);
 
-    pointLight.constant = 0.5f;
-    pointLight.linear = 0.0f;
-    pointLight.quadratic = 0.0f;
+    pointLight.constant = 1.0f;
+    pointLight.linear = 1.0/30000;
+    pointLight.quadratic = 1.0/(30000*30000);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -210,7 +211,7 @@ int main() {
         if (programState->FollowModeEnabled){
             model = glm::mat4(1.0f);
             model = glm::rotate(model, (float)(currentFrame/(800*0.06)), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
-            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.042f));
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.045f));
 
             programState->camera.Position = glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0));
         }
@@ -226,10 +227,11 @@ int main() {
         ourShader.setFloat("pointLight.linear", pointLight.linear);
         ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
         ourShader.setVec3("viewPosition", programState->camera.Position);
-        ourShader.setFloat("material.shininess", 2.0f);
+        ourShader.setFloat("material.shininess", 8.0f);
+        ourShader.setInt("enable_fong", programState->enable_fong);
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
-                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.001f, 3000.0f);
+                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.002f, 3000.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
@@ -251,7 +253,7 @@ int main() {
 
         sun_model.Draw(sunShader);
 
-        // earth rendering
+        // earth and clouds rendering
         ourShader.use();
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
@@ -262,22 +264,26 @@ int main() {
 
         earth_model.Draw(ourShader);
 
-        // clouds rendering
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, (float)(currentFrame/800), glm::vec3(0.0,1.0,0.0)); //Implementing Earth rotation around its axis
-        model = glm::rotate(model, (float)(-M_PI/2), glm::vec3(1.0,0.0,0.0)); //Fixing model wrong orientation
-        model = glm::scale(model, glm::vec3(1.005));
-        ourShader.setMat4("model", model);
+        float distance_to_camera = glm::distance(programState->camera.Position, glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0)));//fix to z fighting
+        if (distance_to_camera < 75) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+            model = glm::rotate(model, (float) (currentFrame / 800),
+                                glm::vec3(0.0, 1.0, 0.0)); //Implementing Earth rotation around its axis
+            model = glm::rotate(model, (float) (-M_PI / 2), glm::vec3(1.0, 0.0, 0.0)); //Fixing model wrong orientation
+            model = glm::scale(model, glm::vec3(1.002 + (distance_to_camera / 400)));
+            ourShader.setMat4("model", model);
 
-        clouds_model.Draw(ourShader);
+            clouds_model.Draw(ourShader);
+        }
+
 
         //vostok rendering
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 
         model = glm::rotate(model, (float)(currentFrame/(800*0.06)), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.04f));
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.04f));//orbit made slightly bigger because it looks nicer
         model = glm::rotate(model, (float)((currentFrame+(800*0.1*3))/(800*0.1)), glm::vec3(-1.0,2.0,-3.0)); //Adding small rotation to the model
         model = glm::scale(model, glm::vec3(1*0.00008));//Model is bigger than it should be to avoid float precision issues
         ourShader.setMat4("model", model);
@@ -405,6 +411,7 @@ void DrawImGui(ProgramState *programState) {
         ImGui::Text("Camera front: (%f, %f, %f)", c.Front.x, c.Front.y, c.Front.z);
         ImGui::Checkbox("Camera mouse update", &programState->CameraMouseMovementUpdateEnabled);
         ImGui::Checkbox("Follow capsule", &programState->FollowModeEnabled);
+        ImGui::Checkbox("Enable fong", &programState->enable_fong);
         ImGui::End();
     }
 
