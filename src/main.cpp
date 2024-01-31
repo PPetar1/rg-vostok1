@@ -29,6 +29,8 @@ void processInput(GLFWwindow *window);
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
+unsigned int loadCubemap(vector<std::string> faces);
+
 // settings
 const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 1200;
@@ -149,14 +151,14 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE); //We use face culling, in this way the side of the models not facing us is not rendered
-    glEnable(GL_BLEND); //Enabling blending to render clouds properly
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_CULL_FACE); //Enable face culling, in this way the side of the models not facing us is not rendered
+
 
     // build and compile shaders
     // -------------------------
     Shader ourShader("resources/shaders/vertex_shader.vs", "resources/shaders/fragment_shader.fs");
     Shader sunShader("resources/shaders/vertex_shader.vs", "resources/shaders/sun_fragment_shader.fs");
+    Shader skyboxShader("resources/shaders/skybox_vertex_shader.vs", "resources/shaders/skybox_fragment_shader.fs");
 
     // load models
     // -----------
@@ -177,13 +179,78 @@ int main() {
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
-    pointLight.ambient = glm::vec3(0.05, 0.05, 0.05);
+    pointLight.ambient = glm::vec3(0.04, 0.04, 0.04);
     pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
     pointLight.specular = glm::vec3(0.5, 0.5, 0.5);
 
     pointLight.constant = 1.0f;
     pointLight.linear = 1.0/30000;
     pointLight.quadratic = 1.0/(30000*30000);
+
+    float skybox_vertices []{
+            -1.0f,  1.0f, -1.0f,
+            -1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+            1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+
+            -1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f,  1.0f,
+            -1.0f, -1.0f,  1.0f,
+
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+
+            -1.0f, -1.0f,  1.0f,
+            -1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f,  1.0f,
+
+            -1.0f,  1.0f, -1.0f,
+            1.0f,  1.0f, -1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            -1.0f,  1.0f,  1.0f,
+            -1.0f,  1.0f, -1.0f,
+
+            -1.0f, -1.0f, -1.0f,
+            -1.0f, -1.0f,  1.0f,
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+            -1.0f, -1.0f,  1.0f,
+            1.0f, -1.0f,  1.0f
+    };
+
+    unsigned int skyboxVBO, skyboxVAO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof (skybox_vertices), &skybox_vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    vector<std::string> textures_faces = {"resources/textures/right.png",
+                                          "resources/textures/left.png",
+                                          "resources/textures/top.png",
+                                          "resources/textures/bot.png",
+                                          "resources/textures/front.png",
+                                          "resources/textures/back.png"};
+
+    unsigned int skybox_texture;
+    skybox_texture = loadCubemap(textures_faces);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -209,14 +276,18 @@ int main() {
         //if follow mode is enabled set camera position to follow the capsule
         glm::mat4 model;
         if (programState->FollowModeEnabled){
-            model = glm::mat4(1.0f);
-            model = glm::rotate(model, (float)(currentFrame/(800*0.06)), glm::vec3(-1.0,2.0,0.0)); //Adding rotation around the earth
+            model = glm::mat4(1.0f);//Doing same transformations as we do for vostok model
+            model = glm::rotate(model, (float)(currentFrame/(800*0.06)), glm::vec3(-1.0,2.0,0.0));
             model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.045f));
 
             programState->camera.Position = glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0));
         }
 
-        // don't forget to enable shader before setting uniforms
+        // view/projection transformations
+        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
+                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.002f, 3000.0f);//Setting near value to a higher value would help with z-fighting issue but then the vostok model would not be visable from up close due to it's small size so a fix is used enlarging the clouds as you get further away from earth
+        glm::mat4 view = programState->camera.GetViewMatrix();
+
         ourShader.use();
         pointLight.position = glm::vec3(0.0, 0.0, 2345.0);
         ourShader.setVec3("pointLight.position", pointLight.position);
@@ -229,10 +300,6 @@ int main() {
         ourShader.setVec3("viewPosition", programState->camera.Position);
         ourShader.setFloat("material.shininess", 8.0f);
         ourShader.setInt("enable_fong", programState->enable_fong);
-        // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
-                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.002f, 3000.0f);
-        glm::mat4 view = programState->camera.GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
@@ -241,17 +308,9 @@ int main() {
         // earth radius - 6378 km = 1, 23*(M_PI/180) tilt of orbit, vostok orbit ~ 250km (6628 km) = 1.04, vostok size 0.005 km = 0.0000008, vostok orbital period = 0,06 d
         // moon orbit 384 000 km = 60, moon radius 0.27 of earth, moon orbital period = 29 d, 24*(M_PI/180) tilt of orbit (to equator of earth)
         // sun distance 149,600,000 km = 23455, sun radius 109 x earth radius
-        //sun rendering
-        //sun size and distance not correct - due to float precision there were some glitches when put to proper values; Sun is here 10x closer and scaled to look ok
-        sunShader.use();
-        sunShader.setMat4("projection", projection);
-        sunShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 2345.0f));
-        model = glm::scale(model, glm::vec3(20.0));
-        sunShader.setMat4("model", model);
 
-        sun_model.Draw(sunShader);
+        glEnable(GL_BLEND); //Enabling blending to render clouds properly
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // earth and clouds rendering
         ourShader.use();
@@ -264,19 +323,21 @@ int main() {
 
         earth_model.Draw(ourShader);
 
-        float distance_to_camera = glm::distance(programState->camera.Position, glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0)));//fix to z fighting
+        //another option is to make a separate shader and have distance passed to it and make the alpha value = alpha^1/distance so that the clouds become more transparent the further you distance yourself from earth
+        float distance_to_camera = glm::distance(programState->camera.Position, glm::vec3(model * glm::vec4(0.0, 0.0, 0.0, 1.0)));//if distance is large z-fighting is noticable so we dont render the clouds
         if (distance_to_camera < 75) {
             model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
             model = glm::rotate(model, (float) (currentFrame / 800),
                                 glm::vec3(0.0, 1.0, 0.0)); //Implementing Earth rotation around its axis
             model = glm::rotate(model, (float) (-M_PI / 2), glm::vec3(1.0, 0.0, 0.0)); //Fixing model wrong orientation
-            model = glm::scale(model, glm::vec3(1.002 + (distance_to_camera / 400)));
+            model = glm::scale(model, glm::vec3(1.002 + (distance_to_camera / 400)));//fix to z fighting
             ourShader.setMat4("model", model);
 
             clouds_model.Draw(ourShader);
         }
 
+        glDisable(GL_BLEND); //Blending should only affect earth and the clouds, another way is to calculate distance to each object and draw them in the sorted order
 
         //vostok rendering
         model = glm::mat4(1.0f);
@@ -303,9 +364,31 @@ int main() {
 
         moon_model.Draw(ourShader);
 
+        //sun rendering
+        //sun size and distance not correct - due to float precision there were some glitches when put to proper values; Sun is here 10x closer and scaled to look ok
+        sunShader.use();
+        sunShader.setMat4("projection", projection);
+        sunShader.setMat4("view", view);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 2345.0f));
+        model = glm::scale(model, glm::vec3(20.0));
+        sunShader.setMat4("model", model);
+
+        sun_model.Draw(sunShader);
+
+        //drawing the skybox
+        glDepthFunc(GL_LEQUAL);
+        skyboxShader.use();
+        skyboxShader.setMat4("projection", projection);
+        skyboxShader.setMat4("view", glm::mat4(glm::mat3(view)));
+        glBindVertexArray(skyboxVAO);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skybox_texture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS);
+
         if (programState->ImGuiEnabled)
             DrawImGui(programState);
-
 
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -429,4 +512,36 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
     }
+}
+
+unsigned int loadCubemap(vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            );
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap tex failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
 }
