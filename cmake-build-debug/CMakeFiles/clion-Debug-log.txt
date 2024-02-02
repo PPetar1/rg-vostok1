@@ -1,5 +1,0 @@
-/home/ppetar/clion-2023.3.2/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/home/ppetar/clion-2023.3.2/bin/ninja/linux/x64/ninja -G Ninja -S /home/ppetar/Documents/racunarska_grafika/projekat -B /home/ppetar/Documents/racunarska_grafika/projekat/cmake-build-debug
--- Found ASSIMP: /usr/lib/x86_64-linux-gnu/libassimp.so
--- Configuring done (0.0s)
--- Generating done (0.0s)
--- Build files have been written to: /home/ppetar/Documents/racunarska_grafika/projekat/cmake-build-debug
